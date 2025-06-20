@@ -43,15 +43,15 @@ pub const Dotenv = struct {
 
         const eq_index = mem.indexOfScalar(u8, trimmed, options.separator) orelse return null;
         const key = mem.trim(u8, trimmed[0..eq_index], options.trim_chars);
-        var value = mem.trim(u8, trimmed[eq_index+1..], options.trim_chars);
+        var value = mem.trim(u8, trimmed[eq_index + 1 ..], options.trim_chars);
 
         if (key.len == 0) return null;
 
         // Remove quotes and handle escapes
         if (value.len > 1 and (value[0] == '"' or value[0] == '\'')) {
             const quote = value[0];
-            if (value[value.len-1] == quote) {
-                value = value[1..value.len-1];
+            if (value[value.len - 1] == quote) {
+                value = value[1 .. value.len - 1];
             }
 
             var buf = try self.allocator.alloc(u8, value.len);
@@ -60,7 +60,7 @@ pub const Dotenv = struct {
             var j: usize = 0;
             var k: usize = 0;
             while (k < value.len) : (k += 1) {
-                if (value[k] == '\\' and k+1 < value.len) {
+                if (value[k] == '\\' and k + 1 < value.len) {
                     k += 1;
                     switch (value[k]) {
                         '\\' => buf[j] = '\\',
@@ -79,18 +79,18 @@ pub const Dotenv = struct {
 
             const key_copy = try self.allocator.dupe(u8, key);
             const value_copy = try self.allocator.dupe(u8, buf[0..j]);
-            
-            return .{ 
-                .key = key_copy, 
+
+            return .{
+                .key = key_copy,
                 .value = value_copy,
             };
         }
 
         const key_copy = try self.allocator.dupe(u8, key);
         const value_copy = try self.allocator.dupe(u8, value);
-        
-        return .{ 
-            .key = key_copy, 
+
+        return .{
+            .key = key_copy,
             .value = value_copy,
         };
     }
@@ -108,7 +108,7 @@ pub const Dotenv = struct {
         while (i < content.len) {
             var line_end = i;
             while (line_end < content.len and content[line_end] != '\n' and content[line_end] != '\r') : (line_end += 1) {}
-            
+
             const line = content[i..line_end];
             i = line_end;
             while (i < content.len and (content[i] == '\n' or content[i] == '\r')) : (i += 1) {}
@@ -185,7 +185,7 @@ pub const Dotenv = struct {
     pub fn toString(self: Self, options: Options) ![]u8 {
         var list = std.ArrayList(u8).init(self.allocator);
         defer list.deinit();
-        
+
         var it = self.map.iterator();
         while (it.next()) |entry| {
             try list.appendSlice(entry.key_ptr.*);

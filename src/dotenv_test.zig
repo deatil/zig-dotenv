@@ -40,7 +40,7 @@ test "parse empty and comment lines" {
         \\FOO=1
         \\BAR=2
         \\# another comment
-        , .{});
+    , .{});
     try std.testing.expectEqualStrings("1", env.get("FOO").?);
     try std.testing.expectEqualStrings("2", env.get("BAR").?);
     try std.testing.expect(env.get("BAZ") == null);
@@ -55,7 +55,7 @@ test "parse file and keys" {
         \\BAR="def ghi"
         \\# Test
         \\BAZ=xyz
-        ;
+    ;
     const tmp_path = "test.env";
     {
         var file = try std.fs.cwd().createFile(tmp_path, .{ .read = true });
@@ -95,6 +95,7 @@ test "vars returns all DotenvVar structs" {
 
     const vars = try env.values();
     defer alloc.free(vars);
+
     var found_a = false;
     var found_b = false;
     for (vars) |item| {
@@ -103,4 +104,14 @@ test "vars returns all DotenvVar structs" {
     }
 
     try std.testing.expect(found_a and found_b);
+
+    const check_content =
+        \\A=1
+        \\B=2
+        \\
+    ;
+    const res = try env.toString(.{});
+    defer alloc.free(res);
+
+    try std.testing.expectEqualStrings(check_content, res);
 }
