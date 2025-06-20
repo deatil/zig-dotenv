@@ -67,7 +67,7 @@ pub fn main() !void {
     const got_foo = = env.get("FOO").?;
 
     // output: 
-    // dotenv got: 1
+    // dotenv got: abc
     std.debug.print("dotenv got: {s} \n", .{got_foo});
 }
 ~~~
