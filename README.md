@@ -64,10 +64,10 @@ pub fn main() !void {
 
     try env.parse(env_data, .{});
 
-    const got_foo = = env.get("FOO").?;
+    const got_foo = env.get("FOO").?;
 
     // output: 
-    // dotenv got: 1
+    // dotenv got: abc
     std.debug.print("dotenv got: {s} \n", .{got_foo});
 }
 ~~~
