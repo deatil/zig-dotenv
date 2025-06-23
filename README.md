@@ -59,10 +59,10 @@ pub fn main() !void {
         \\BAZ=xyz
         ;
     
-    var env = dotenv.Dotenv.init(alloc);
+    var env = dotenv.Dotenv.init(alloc, .{});
     defer env.deinit();
 
-    try env.parse(env_data, .{});
+    try env.parse(env_data);
 
     const got_foo = env.get("FOO").?;
 
