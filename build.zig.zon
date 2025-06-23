@@ -1,6 +1,6 @@
 .{
     .name = .zig_dotenv,
-    .version = "0.0.1",
+    .version = "1.0.1",
     .fingerprint = 0x9dcc7bd4893a3879,
     .minimum_zig_version = "0.15.0-dev.337+4e700fdf8",
     .dependencies = .{},

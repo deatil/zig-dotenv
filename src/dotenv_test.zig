@@ -6,10 +6,10 @@ const dotenv = @import("dotenv.zig");
 test "parse single line" {
     const alloc = testing.allocator;
 
-    var env = dotenv.Dotenv.init(alloc);
+    var env = dotenv.Dotenv.init(alloc, .{});
     defer env.deinit();
 
-    if (try env.parseLine("FOO=bar", .{})) |kv| {
+    if (try env.parseLine("FOO=bar")) |kv| {
         try env.map.put(kv.key, kv.value);
     }
     try std.testing.expectEqualStrings("bar", env.get("FOO").?);
@@ -18,10 +18,10 @@ test "parse single line" {
 test "parse quoted and escaped value" {
     const alloc = testing.allocator;
 
-    var env = dotenv.Dotenv.init(alloc);
+    var env = dotenv.Dotenv.init(alloc, .{});
     defer env.deinit();
 
-    if (try env.parseLine("BAR=\"baz\\nbat\"", .{})) |kv| {
+    if (try env.parseLine("BAR=\"baz\\nbat\"")) |kv| {
         try env.map.put(kv.key, kv.value);
     }
 
@@ -31,7 +31,7 @@ test "parse quoted and escaped value" {
 test "parse empty and comment lines" {
     const alloc = testing.allocator;
 
-    var env = dotenv.Dotenv.init(alloc);
+    var env = dotenv.Dotenv.init(alloc, .{});
     defer env.deinit();
 
     try env.parse(
@@ -40,7 +40,7 @@ test "parse empty and comment lines" {
         \\FOO=1
         \\BAR=2
         \\# another comment
-    , .{});
+    );
     try std.testing.expectEqualStrings("1", env.get("FOO").?);
     try std.testing.expectEqualStrings("2", env.get("BAR").?);
     try std.testing.expect(env.get("BAZ") == null);
@@ -64,9 +64,9 @@ test "parse file and keys" {
     }
     defer std.fs.cwd().deleteFile(tmp_path) catch {};
 
-    var env = dotenv.Dotenv.init(alloc);
+    var env = dotenv.Dotenv.init(alloc, .{});
     defer env.deinit();
-    try env.parseFile(tmp_path, .{});
+    try env.parseFile(tmp_path);
 
     const keys = try env.keys();
     defer alloc.free(keys);
@@ -82,12 +82,32 @@ test "parse file and keys" {
     try std.testing.expectEqualStrings("abc", env.get("FOO").?);
     try std.testing.expectEqualStrings("def ghi", env.get("BAR").?);
     try std.testing.expectEqualStrings("xyz", env.get("BAZ").?);
+
+    try std.testing.expectEqual(true, env.has("BAZ"));
+    try std.testing.expectEqual(false, env.has("BAZ2"));
+
+    try std.testing.expectEqual(3, env.count());
+    try std.testing.expectEqual(false, env.isEmpty());
+
+    try env.set("BAR", "test new");
+    try std.testing.expectEqualStrings("test new", env.get("BAR").?);
+
+    try env.set("BAR2", "test new2");
+    try std.testing.expectEqual(true, env.has("BAR2"));
+    try std.testing.expectEqualStrings("test new2", env.get("BAR2").?);
+    try std.testing.expectEqual(4, env.count());
+
+    const removed = env.remove("BAR2");
+    try std.testing.expectEqual(true, removed);
+    try std.testing.expectEqual(false, env.has("BAR2"));
+    try std.testing.expect(env.get("BAR2") == null);
+    try std.testing.expectEqual(3, env.count());
 }
 
 test "vars returns all DotenvVar structs" {
     const alloc = testing.allocator;
 
-    var env = dotenv.Dotenv.init(alloc);
+    var env = dotenv.Dotenv.init(alloc, .{});
     defer env.deinit();
 
     try env.set("A", "1");
@@ -110,8 +130,25 @@ test "vars returns all DotenvVar structs" {
         \\B=2
         \\
     ;
-    const res = try env.toString(.{});
+    const res = try env.toString();
     defer alloc.free(res);
 
     try std.testing.expectEqualStrings(check_content, res);
+}
+
+test "withOptions" {
+    const alloc = testing.allocator;
+
+    var env = dotenv.Dotenv.init(alloc, .{});
+    defer env.deinit();
+
+    env.withOptions(.{
+        .separator = '_',
+        .comment = '@',
+        .trim_chars = " \t\r\n2",
+    });
+
+    try std.testing.expectEqual('_', env.options.separator);
+    try std.testing.expectEqual('@', env.options.comment);
+    try std.testing.expectEqualStrings(" \t\r\n2", env.options.trim_chars);
 }

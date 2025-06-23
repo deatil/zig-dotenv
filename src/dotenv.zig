@@ -6,7 +6,8 @@ const StringArrayMap = std.StringArrayHashMap([]const u8);
 
 pub const Dotenv = struct {
     map: StringArrayMap,
-    allocator: Allocator,
+    options: Options,
+    alloc: Allocator,
 
     const Self = @This();
 
@@ -21,23 +22,54 @@ pub const Dotenv = struct {
         value: []const u8,
     };
 
-    pub fn init(allocator: Allocator) Self {
+    pub fn init(alloc: Allocator, options: Options) Self {
         return .{
-            .map = StringArrayMap.init(allocator),
-            .allocator = allocator,
+            .map = StringArrayMap.init(alloc),
+            .options = options,
+            .alloc = alloc,
         };
     }
 
     pub fn deinit(self: *Self) void {
         var it = self.map.iterator();
         while (it.next()) |entry| {
-            self.allocator.free(entry.key_ptr.*);
-            self.allocator.free(entry.value_ptr.*);
+            self.alloc.free(entry.key_ptr.*);
+            self.alloc.free(entry.value_ptr.*);
         }
         self.map.deinit();
     }
 
-    pub fn parseLine(self: *Self, line: []const u8, options: Options) !?VarData {
+    pub fn withOptions(self: *Self, options: Options) void {
+        self.options = options;
+    }
+
+    pub fn parse(self: *Self, content: []const u8) !void {
+        var it = self.map.iterator();
+        while (it.next()) |entry| {
+            self.alloc.free(entry.key_ptr.*);
+            self.alloc.free(entry.value_ptr.*);
+        }
+
+        self.map.clearRetainingCapacity();
+
+        var i: usize = 0;
+        while (i < content.len) {
+            var line_end = i;
+            while (line_end < content.len and content[line_end] != '\n' and content[line_end] != '\r') : (line_end += 1) {}
+
+            const line = content[i..line_end];
+            i = line_end;
+            while (i < content.len and (content[i] == '\n' or content[i] == '\r')) : (i += 1) {}
+
+            if (try self.parseLine(line)) |envvar| {
+                try self.map.put(envvar.key, envvar.value);
+            }
+        }
+    }
+
+    pub fn parseLine(self: *Self, line: []const u8) !?VarData {
+        const options = self.options;
+
         const trimmed = mem.trim(u8, line, options.trim_chars);
         if (trimmed.len == 0 or trimmed[0] == options.comment) return null;
 
@@ -54,8 +86,8 @@ pub const Dotenv = struct {
                 value = value[1 .. value.len - 1];
             }
 
-            var buf = try self.allocator.alloc(u8, value.len);
-            defer self.allocator.free(buf);
+            var buf = try self.alloc.alloc(u8, value.len);
+            defer self.alloc.free(buf);
 
             var j: usize = 0;
             var k: usize = 0;
@@ -77,8 +109,8 @@ pub const Dotenv = struct {
                 j += 1;
             }
 
-            const key_copy = try self.allocator.dupe(u8, key);
-            const value_copy = try self.allocator.dupe(u8, buf[0..j]);
+            const key_copy = try self.alloc.dupe(u8, key);
+            const value_copy = try self.alloc.dupe(u8, buf[0..j]);
 
             return .{
                 .key = key_copy,
@@ -86,8 +118,8 @@ pub const Dotenv = struct {
             };
         }
 
-        const key_copy = try self.allocator.dupe(u8, key);
-        const value_copy = try self.allocator.dupe(u8, value);
+        const key_copy = try self.alloc.dupe(u8, key);
+        const value_copy = try self.alloc.dupe(u8, value);
 
         return .{
             .key = key_copy,
@@ -95,50 +127,27 @@ pub const Dotenv = struct {
         };
     }
 
-    pub fn parse(self: *Self, content: []const u8, options: Options) !void {
-        var it = self.map.iterator();
-        while (it.next()) |entry| {
-            self.allocator.free(entry.key_ptr.*);
-            self.allocator.free(entry.value_ptr.*);
-        }
-
-        self.map.clearRetainingCapacity();
-
-        var i: usize = 0;
-        while (i < content.len) {
-            var line_end = i;
-            while (line_end < content.len and content[line_end] != '\n' and content[line_end] != '\r') : (line_end += 1) {}
-
-            const line = content[i..line_end];
-            i = line_end;
-            while (i < content.len and (content[i] == '\n' or content[i] == '\r')) : (i += 1) {}
-
-            if (try self.parseLine(line, options)) |envvar| {
-                try self.map.put(envvar.key, envvar.value);
-            }
-        }
-    }
-
-    pub fn parseFile(self: *Self, path: []const u8, options: Options) !void {
+    pub fn parseFile(self: *Self, path: []const u8) !void {
         var file = try std.fs.cwd().openFile(path, .{});
         defer file.close();
 
         const stat = try file.stat();
-        const content = try self.allocator.alloc(u8, stat.size);
-        defer self.allocator.free(content);
+        const content = try self.alloc.alloc(u8, stat.size);
+        defer self.alloc.free(content);
 
         _ = try file.readAll(content);
-        try self.parse(content, options);
+        try self.parse(content);
     }
 
+    /// Set a kv data
     pub fn set(self: *Self, key: []const u8, value: []const u8) !void {
-        if (self.map.getEntry(key)) |entry| {
-            self.allocator.free(entry.key_ptr.*);
-            self.allocator.free(entry.value_ptr.*);
+        if (self.map.fetchOrderedRemove(key)) |entry| {
+            self.alloc.free(entry.key);
+            self.alloc.free(entry.value);
         }
 
-        const key_copy = try self.allocator.dupe(u8, key);
-        const value_copy = try self.allocator.dupe(u8, value);
+        const key_copy = try self.alloc.dupe(u8, key);
+        const value_copy = try self.alloc.dupe(u8, value);
         try self.map.put(key_copy, value_copy);
     }
 
@@ -147,16 +156,30 @@ pub const Dotenv = struct {
     }
 
     pub fn remove(self: *Self, key: []const u8) bool {
-        if (self.map.getEntry(key)) |entry| {
-            self.allocator.free(entry.key_ptr.*);
-            self.allocator.free(entry.value_ptr.*);
+        if (self.map.fetchOrderedRemove(key)) |entry| {
+            self.alloc.free(entry.key);
+            self.alloc.free(entry.value);
+
+            return true;
         }
 
-        return self.map.remove(key);
+        return false;
+    }
+
+    pub fn has(self: Self, key: []const u8) bool {
+        return self.map.contains(key);
+    }
+
+    pub fn count(self: Self) usize {
+        return self.map.count();
+    }
+
+    pub fn isEmpty(self: Self) bool {
+        return self.map.count() == 0;
     }
 
     pub fn keys(self: Self) ![][]const u8 {
-        var keys_list = std.ArrayList([]const u8).init(self.allocator);
+        var keys_list = std.ArrayList([]const u8).init(self.alloc);
         defer keys_list.deinit();
 
         var it = self.map.iterator();
@@ -168,7 +191,7 @@ pub const Dotenv = struct {
     }
 
     pub fn values(self: Self) ![]VarData {
-        var vars_list = std.ArrayList(VarData).init(self.allocator);
+        var vars_list = std.ArrayList(VarData).init(self.alloc);
         defer vars_list.deinit();
 
         var it = self.map.iterator();
@@ -182,8 +205,10 @@ pub const Dotenv = struct {
         return vars_list.toOwnedSlice();
     }
 
-    pub fn toString(self: Self, options: Options) ![]u8 {
-        var list = std.ArrayList(u8).init(self.allocator);
+    pub fn toString(self: Self) ![]u8 {
+        const options = self.options;
+
+        var list = std.ArrayList(u8).init(self.alloc);
         defer list.deinit();
 
         var it = self.map.iterator();
