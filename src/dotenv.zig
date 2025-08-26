@@ -179,67 +179,67 @@ pub const Dotenv = struct {
     }
 
     pub fn keys(self: Self) ![][]const u8 {
-        var keys_list = std.ArrayList([]const u8).init(self.alloc);
-        defer keys_list.deinit();
+        var keys_list = try std.ArrayList([]const u8).initCapacity(self.alloc, 0);
+        defer keys_list.deinit(self.alloc);
 
         var it = self.map.iterator();
         while (it.next()) |entry| {
-            try keys_list.append(entry.key_ptr.*);
+            try keys_list.append(self.alloc, entry.key_ptr.*);
         }
 
-        return keys_list.toOwnedSlice();
+        return keys_list.toOwnedSlice(self.alloc);
     }
 
     pub fn values(self: Self) ![]VarData {
-        var vars_list = std.ArrayList(VarData).init(self.alloc);
-        defer vars_list.deinit();
+        var vars_list = try std.ArrayList(VarData).initCapacity(self.alloc, 0);
+        defer vars_list.deinit(self.alloc);
 
         var it = self.map.iterator();
         while (it.next()) |entry| {
-            try vars_list.append(.{
+            try vars_list.append(self.alloc, .{
                 .key = entry.key_ptr.*,
                 .value = entry.value_ptr.*,
             });
         }
 
-        return vars_list.toOwnedSlice();
+        return vars_list.toOwnedSlice(self.alloc);
     }
 
     pub fn toString(self: Self) ![]u8 {
         const options = self.options;
 
-        var list = std.ArrayList(u8).init(self.alloc);
-        defer list.deinit();
+        var list = try std.ArrayList(u8).initCapacity(self.alloc, 0);
+        defer list.deinit(self.alloc);
 
         var it = self.map.iterator();
         while (it.next()) |entry| {
-            try list.appendSlice(entry.key_ptr.*);
-            try list.append(options.separator);
+            try list.appendSlice(self.alloc, entry.key_ptr.*);
+            try list.append(self.alloc, options.separator);
 
             const value = entry.value_ptr.*;
             const need_quote = mem.indexOfAny(u8, value, " #") != null;
             if (need_quote) {
-                try list.append('"');
+                try list.append(self.alloc, '"');
                 for (value) |c| {
                     switch (c) {
-                        '\\' => try list.appendSlice("\\\\"),
-                        '\n' => try list.appendSlice("\\n"),
-                        '\r' => try list.appendSlice("\\r"),
-                        '\t' => try list.appendSlice("\\t"),
-                        '"' => try list.appendSlice("\\\""),
-                        else => try list.append(c),
+                        '\\' => try list.appendSlice(self.alloc, "\\\\"),
+                        '\n' => try list.appendSlice(self.alloc, "\\n"),
+                        '\r' => try list.appendSlice(self.alloc, "\\r"),
+                        '\t' => try list.appendSlice(self.alloc, "\\t"),
+                        '"' => try list.appendSlice(self.alloc, "\\\""),
+                        else => try list.append(self.alloc, c),
                     }
                 }
 
-                try list.append('"');
+                try list.append(self.alloc, '"');
             } else {
-                try list.appendSlice(value);
+                try list.appendSlice(self.alloc, value);
             }
 
-            try list.append('\n');
+            try list.append(self.alloc, '\n');
         }
 
-        return list.toOwnedSlice();
+        return list.toOwnedSlice(self.alloc);
     }
 };
 

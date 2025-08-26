@@ -5,7 +5,7 @@ A dotenv library for zig.
 
 ### Env
 
- - Zig >= 0.15.0-dev.337+4e700fdf8
+ - Zig >= 0.15.1
 
 
 ### Adding zig-dotenv as a dependency
@@ -59,10 +59,10 @@ pub fn main() !void {
         \\BAZ=xyz
         ;
     
-    var env = dotenv.Dotenv.init(alloc, .{});
+    var env = dotenv.Dotenv.init(alloc);
     defer env.deinit();
 
-    try env.parse(env_data);
+    try env.parse(env_data, .{});
 
     const got_foo = env.get("FOO").?;
 
