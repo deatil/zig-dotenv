@@ -5,7 +5,7 @@ A dotenv library for zig.
 
 ### Env
 
- - Zig >= 0.15.1
+ - Zig >= 0.16.0
 
 
 ### Adding zig-dotenv as a dependency
@@ -49,7 +49,9 @@ const dotenv = @import("zig-dotenv");
 const std = @import("std");
 const dotenv = @import("zig-dotenv");
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    _ = init;
+    
     const alloc = std.heap.page_allocator;
 
     const env_data =

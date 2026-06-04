@@ -1,8 +1,9 @@
 const std = @import("std");
+const Io = std.Io;
 const mem = std.mem;
 const Allocator = std.mem.Allocator;
 
-const StringArrayMap = std.StringArrayHashMap([]const u8);
+const StringArrayMap = std.array_hash_map.String([]const u8);
 
 pub const Dotenv = struct {
     map: StringArrayMap,
@@ -24,7 +25,7 @@ pub const Dotenv = struct {
 
     pub fn init(alloc: Allocator, options: Options) Self {
         return .{
-            .map = StringArrayMap.init(alloc),
+            .map = .empty,
             .options = options,
             .alloc = alloc,
         };
@@ -36,7 +37,7 @@ pub const Dotenv = struct {
             self.alloc.free(entry.key_ptr.*);
             self.alloc.free(entry.value_ptr.*);
         }
-        self.map.deinit();
+        self.map.deinit(self.alloc);
     }
 
     pub fn withOptions(self: *Self, options: Options) void {
@@ -62,7 +63,7 @@ pub const Dotenv = struct {
             while (i < content.len and (content[i] == '\n' or content[i] == '\r')) : (i += 1) {}
 
             if (try self.parseLine(line)) |envvar| {
-                try self.map.put(envvar.key, envvar.value);
+                try self.map.put(self.alloc, envvar.key, envvar.value);
             }
         }
     }
@@ -127,15 +128,16 @@ pub const Dotenv = struct {
         };
     }
 
-    pub fn parseFile(self: *Self, path: []const u8) !void {
-        var file = try std.fs.cwd().openFile(path, .{});
-        defer file.close();
+    pub fn parseFile(self: *Self, io: Io, path: []const u8) !void {
+        const cwd = std.Io.Dir.cwd();
+        var file = try cwd.openFile(io, path, .{});
+        defer file.close(io);
 
-        const stat = try file.stat();
+        const stat = try file.stat(io);
         const content = try self.alloc.alloc(u8, stat.size);
         defer self.alloc.free(content);
 
-        _ = try file.readAll(content);
+        _ = try file.readPositionalAll(io, content, 0);
         try self.parse(content);
     }
 
@@ -148,7 +150,7 @@ pub const Dotenv = struct {
 
         const key_copy = try self.alloc.dupe(u8, key);
         const value_copy = try self.alloc.dupe(u8, value);
-        try self.map.put(key_copy, value_copy);
+        try self.map.put(self.alloc, key_copy, value_copy);
     }
 
     pub fn get(self: Self, key: []const u8) ?[]const u8 {

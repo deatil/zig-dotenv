@@ -10,7 +10,7 @@ test "parse single line" {
     defer env.deinit();
 
     if (try env.parseLine("FOO=bar")) |kv| {
-        try env.map.put(kv.key, kv.value);
+        try env.map.put(alloc, kv.key, kv.value);
     }
     try std.testing.expectEqualStrings("bar", env.get("FOO").?);
 }
@@ -22,7 +22,7 @@ test "parse quoted and escaped value" {
     defer env.deinit();
 
     if (try env.parseLine("BAR=\"baz\\nbat\"")) |kv| {
-        try env.map.put(kv.key, kv.value);
+        try env.map.put(alloc, kv.key, kv.value);
     }
 
     try std.testing.expectEqualStrings("baz\nbat", env.get("BAR").?);
@@ -48,6 +48,8 @@ test "parse empty and comment lines" {
 
 test "parse file and keys" {
     const alloc = testing.allocator;
+    const io = testing.io;
+    const cwd = std.Io.Dir.cwd();
 
     // Write a temp .env file
     const test_content =
@@ -58,15 +60,15 @@ test "parse file and keys" {
     ;
     const tmp_path = "test.env";
     {
-        var file = try std.fs.cwd().createFile(tmp_path, .{ .read = true });
-        defer file.close();
-        _ = try file.write(test_content);
+        var file = try cwd.createFile(io, tmp_path, .{ .read = true });
+        defer file.close(io);
+        _ = try file.writeStreamingAll(io, test_content);
     }
-    defer std.fs.cwd().deleteFile(tmp_path) catch {};
+    defer cwd.deleteFile(io, tmp_path) catch {};
 
     var env = dotenv.Dotenv.init(alloc, .{});
     defer env.deinit();
-    try env.parseFile(tmp_path);
+    try env.parseFile(io, tmp_path);
 
     const keys = try env.keys();
     defer alloc.free(keys);
