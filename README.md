@@ -5,7 +5,7 @@ A dotenv library for zig.
 
 ### Env
 
- - Zig >= 0.16.0
+ - Zig >= 0.17.0
 
 
 ### Adding zig-dotenv as a dependency
