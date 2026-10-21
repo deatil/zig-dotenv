@@ -74,7 +74,7 @@ pub const Dotenv = struct {
         const trimmed = mem.trim(u8, line, options.trim_chars);
         if (trimmed.len == 0 or trimmed[0] == options.comment) return null;
 
-        const eq_index = mem.indexOfScalar(u8, trimmed, options.separator) orelse return null;
+        const eq_index = mem.findScalar(u8, trimmed, options.separator) orelse return null;
         const key = mem.trim(u8, trimmed[0..eq_index], options.trim_chars);
         var value = mem.trim(u8, trimmed[eq_index + 1 ..], options.trim_chars);
 
@@ -219,7 +219,7 @@ pub const Dotenv = struct {
             try list.append(self.alloc, options.separator);
 
             const value = entry.value_ptr.*;
-            const need_quote = mem.indexOfAny(u8, value, " #") != null;
+            const need_quote = mem.findAny(u8, value, " #") != null;
             if (need_quote) {
                 try list.append(self.alloc, '"');
                 for (value) |c| {
